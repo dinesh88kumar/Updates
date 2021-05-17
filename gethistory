@@ -1,0 +1,119 @@
+import 'Auth.dart';
+
+bool lodingcompleted;
+List onlinehistory = new List();
+List offlinehistory = new List();
+getHistory(var state) async {
+  lodingcompleted = false;
+  onlinehistory.clear();
+  offlinehistory.clear();
+  await firestore
+      .collection('Waiter')
+      .doc(auth.currentUser.uid)
+      .collection('Tables')
+      .get()
+      .then((value) {
+    value.docs.forEach((eachtabledoc) async {
+      await eachtabledoc.reference
+          .collection('CompletedSessions')
+          .orderBy('SessionTime')
+          .get()
+          .then((value) {
+        value.docs.forEach((completedsessiondoc) async {
+          Map compleetedsession = new Map();
+          int _total = 0;
+          await completedsessiondoc.reference
+              .collection('orders')
+              .get()
+              .then((value) {
+            value.docs.forEach((element) {
+              _total += element.get('Total');
+            });
+          });
+          compleetedsession.addAll({
+            'Total': _total,
+            'SessionId': completedsessiondoc.id,
+            'TableNo': eachtabledoc.get('TableNo'),
+            'Time': DateTime.fromMillisecondsSinceEpoch(int.parse(completedsessiondoc.get('SessionTime').millisecondsSinceEpoch.toString())).hour > 12
+                ? (DateTime.fromMillisecondsSinceEpoch(int.parse(completedsessiondoc.get('SessionTime').millisecondsSinceEpoch.toString())).hour - 12)
+                        .toString() +
+                    ':' +
+                    DateTime.fromMillisecondsSinceEpoch(int.parse(completedsessiondoc.get('SessionTime').millisecondsSinceEpoch.toString()))
+                        .minute
+                        .toString() +
+                    ' '
+                : DateTime.fromMillisecondsSinceEpoch(int.parse(completedsessiondoc
+                            .get('SessionTime')
+                            .millisecondsSinceEpoch
+                            .toString()))
+                        .hour
+                        .toString() +
+                    ':' +
+                    DateTime.fromMillisecondsSinceEpoch(int.parse(
+                            completedsessiondoc
+                                .get('SessionTime')
+                                .millisecondsSinceEpoch
+                                .toString()))
+                        .minute
+                        .toString() +
+                    ' ',
+            //  'Time': DateTime.fromMillisecondsSinceEpoch(int.parse(
+            //          completedsessiondoc
+            //              .get('SessionTime')
+            //              .millisecondsSinceEpoch
+            //              .toString()))
+            //      .hour
+            //      .toString(),
+            'Method': completedsessiondoc.get('PaymentMethod'),
+            'Date': DateTime.fromMillisecondsSinceEpoch(int.parse(
+                        completedsessiondoc
+                            .get('SessionTime')
+                            .millisecondsSinceEpoch
+                            .toString()))
+                    .day
+                    .toString() +
+                '/' +
+                DateTime.fromMillisecondsSinceEpoch(int.parse(
+                        completedsessiondoc
+                            .get('SessionTime')
+                            .millisecondsSinceEpoch
+                            .toString()))
+                    .month
+                    .toString() +
+                '/' +
+                DateTime.fromMillisecondsSinceEpoch(int.parse(
+                        completedsessiondoc
+                            .get('SessionTime')
+                            .millisecondsSinceEpoch
+                            .toString()))
+                    .year
+                    .toString()
+          });
+          compleetedsession.update('Time', (value) {
+            return DateTime.fromMillisecondsSinceEpoch(int.parse(
+                            completedsessiondoc
+                                .get('SessionTime')
+                                .millisecondsSinceEpoch
+                                .toString()))
+                        .hour >
+                    12
+                ? value + 'PM'
+                : value + 'AM';
+          });
+
+          state.setState(() {
+            lodingcompleted = true;
+            compleetedsession['Method'] == 'Table' ||
+                    compleetedsession['Method'] == 'Na'
+                ? offlinehistory.add(compleetedsession)
+                : onlinehistory.add(compleetedsession);
+            offlinehistory
+                .sort((a, b) => b['SessionId'].compareTo(a['SessionId']));
+            onlinehistory
+                .sort((a, b) => b['SessionId'].compareTo(a['SessionId']));
+          });
+        });
+      });
+    });
+  });
+}
