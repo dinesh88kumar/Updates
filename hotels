@@ -1,0 +1,61 @@
+import 'db.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/material.dart';
+import 'package:Smoose/Pages/HotelsListPage.dart';
+
+Future<dynamic> getImage(String image) async {
+  var temp;
+  Reference storageref = await FirebaseStorage.instance
+      .refFromURL('gs://foodie-v1-f6303.appspot.com/');
+
+  await storageref
+      .child(image)
+      .getData(1024 * 1024)
+      .then((value) => temp = value);
+  return MemoryImage(
+    temp,
+  );
+}
+
+List hotellist = new List();
+getallhotelslist(var state) async {
+  List _returnable = new List();
+  List filtered = new List.empty(growable: true);
+  await ResturantsCollection.get().then((value) async {
+    ListofHotels.clear();
+    value.docs.forEach((element) {
+      if (element.get('Subscription') == true) {
+        filtered.add(element);
+      }
+    });
+    filtered.forEach((element) async {
+      if (element.id != 'cWzBNbirPxqB12faVAh3') {
+        Map _t = new Map();
+        _t.addAll(element.data());
+        await getImage(_t['Img']).then((value) {
+          _t.addAll({'DownloadedImg': value});
+          _t.remove('Img');
+          _t.remove('BankaccountDetails');
+          _t.remove('Directions');
+          _t.remove('Favorites');
+          _t.remove('FrequentSearches');
+          _t.remove('FrequentSearches');
+          _t.remove('radius');
+        });
+        while (_t['DownloadedImg'] == null) {
+          await Future.delayed(Duration(milliseconds: 30));
+        }
+        print('The FinalMap is' + _t.toString());
+        _returnable.add(_t);
+        ListofHotels.add(_t['Name']);
+      }
+    });
+    while (_returnable.length != (filtered.length - 1)) {
+      await Future.delayed(Duration(milliseconds: 30));
+    }
+    state.setState(() {
+      hotellist.clear();
+      hotellist.addAll(_returnable);
+    });
+  });
+}
